@@ -2,6 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import type { QueryFunctionContext } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export type Project = {
   id: number;
@@ -20,6 +21,9 @@ const fetchProjects = async (
 };
 
 export default function Home() {
+  
+  const navigate = useNavigate()
+
   const {
     data,
     fetchNextPage,
@@ -51,7 +55,10 @@ export default function Home() {
                 <p>₹ {proj.amount_collected} / {proj.budget}</p>
               </div>
 
-              <Button className="bg-teal-500 text-white px-4 py-2 rounded mt-2">
+              <Button 
+                onClick={() => navigate("/payment", { state: { project: proj } })}
+                className="bg-teal-500 text-white px-4 py-2 rounded mt-2"
+              >
                 Contribute
               </Button>
             </div>

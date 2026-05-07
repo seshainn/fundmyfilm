@@ -47,7 +47,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
+      _retry?: boolean; //add _retry to error config
     };
 
     const isAuthRoute =
@@ -65,6 +65,7 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // if error is 401 and not auth route, logout and send error
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
@@ -77,7 +78,13 @@ api.interceptors.response.use(
     // ❌ Prevent infinite loop on refresh endpoint itself
     if (originalRequest.url?.includes("/auth/refresh")) {
       useAuthStore.getState().logout();
-      return Promise.reject(error);
+      return Promise.resolve({ 
+        data: { accessToken: null }, 
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: originalRequest
+      });
     }
 
     originalRequest._retry = true;

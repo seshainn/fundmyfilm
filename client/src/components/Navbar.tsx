@@ -8,7 +8,7 @@ import { useAuthStore } from "@/store/authStore";
 import { api } from "../api/client";
 
 export default function Navbar() {
-  const { accessToken, logout } = useAuthStore();
+  const { accessToken, logout, isInitialized } = useAuthStore();
 
   // Persisted dark mode
   const [dark, setDark] = useState(
@@ -47,28 +47,31 @@ export default function Navbar() {
 
       {/* Right */}
       <div className="flex gap-3 items-center">
+        { isInitialized ? (
+          !accessToken ? (
+            <>
+              <Link to="/login">
+                <Button variant="secondary" className="bg-white text-black hover:bg-gray-200">
+                  Sign In
+                </Button>
+              </Link>
 
-        {!accessToken ? (
-          <>
-            <Link to="/login">
-              <Button variant="secondary" className="bg-white text-black hover:bg-gray-200">
-                Sign In
-              </Button>
-            </Link>
-
-            <Link to="/register">
-              <Button className="bg-teal-500 hover:bg-teal-600 text-white">
-                Sign Up
-              </Button>
-            </Link>
-          </>
+              <Link to="/register">
+                <Button className="bg-teal-500 hover:bg-teal-600 text-white">
+                  Sign Up
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <Button
+              onClick={handleLogout}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Logout
+            </Button>
+          )
         ) : (
-          <Button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white"
-          >
-            Logout
-          </Button>
+          <div className="w-20 h-8 bg-gray-200 animate-pulse rounded" />
         )}
 
         {/* Dark mode toggle */}
