@@ -16,7 +16,7 @@ export default function Payment() {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PaymentFormData>();
 
-  const onSubmit: SubmitHandler<PaymentFormData> = async (formData) => {
+  const onSubmit: SubmitHandler<PaymentFormData> = async () => {
     if (!stripe || !elements) return;
     const cardElement = elements.getElement(CardElement);
     if (!cardElement) return;
