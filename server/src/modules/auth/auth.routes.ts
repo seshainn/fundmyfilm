@@ -8,5 +8,6 @@ const router = express.Router()
 router.post("/register", authController.registerUser)
 router.post("/login", emailRateLimiter, authController.loginUser)
 router.post("/refresh", validateRefreshToken, authController.refreshTokenHandler)
+router.post("/logout", validateRefreshToken, authController.logoutUser)
 
 export default router

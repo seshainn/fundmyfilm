@@ -41,7 +41,10 @@ export const paymentHandler = catchAsync(async (req: Request, res: Response) => 
             confirm: true,
             automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
             description: `Contribution for project ${project_id}`,
-            }, 
+            metadata: {
+                paymentIdempotencyKey: idempotencyKey
+            }
+        }, 
             { idempotencyKey }
         );
 

@@ -8,8 +8,7 @@ export const generateTokens = (payload: { id: number, role: string }) => {
         throw new ExpressError("Missing AUTH_SECRET_KEY", 500)
     }
     const accessToken = jwt.sign(payload, process.env.AUTH_SECRET_KEY, { expiresIn: "15m" })
-    const refreshToken_unhashed = crypto.randomBytes(32).toString("hex")
-    const refreshToken = sha256(refreshToken_unhashed)
+    const refreshToken = crypto.randomBytes(32).toString("hex")
     const csrfToken = crypto.randomBytes(32).toString("hex")
     return { accessToken, refreshToken, csrfToken }
 }
@@ -19,7 +18,7 @@ export const setAuthCookies = (res: Response, refreshToken: string, csrfToken: s
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    path: "/auth/refresh"
+    path: "/api/auth/refresh"
   });
 
   res.cookie("csrfToken", csrfToken, {
@@ -33,7 +32,7 @@ export const clearAuthCookies = (res: Response) => {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
-    path: "/auth/refresh"
+    path: "/api/auth/refresh"
   });
 
   res.clearCookie("csrfToken", {

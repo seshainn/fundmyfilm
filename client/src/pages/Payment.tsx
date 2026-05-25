@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import type { SubmitHandler } from "react-hook-form";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 
 type PaymentFormData = {
@@ -13,7 +13,9 @@ export default function Payment() {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  const project = location.state?.project;
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PaymentFormData>();
 
   const onSubmit: SubmitHandler<PaymentFormData> = async () => {
@@ -30,9 +32,9 @@ export default function Payment() {
 
     try {
         const { data } = await api.post("/payment", {
-            paymentMethodId: paymentMethod.id,
-            amount: 500, // Example
-            project_id: "123"
+            payment_method_id: paymentMethod.id,
+            amount: project.amount_collected,
+            project_id: project.id
         });
 
         if (data.status === "requires_action") {

@@ -22,7 +22,7 @@ export default function Register() {
   };
 
   return (
-    <div className="flex items-centerjustify-center mt-10">
+    <div className="flex items-center justify-center mt-10">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="space-y-4 bg-white p-6 shadow rounded"

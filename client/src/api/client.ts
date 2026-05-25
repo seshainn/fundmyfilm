@@ -50,10 +50,10 @@ api.interceptors.response.use(
       _retry?: boolean; //add _retry to error config
     };
 
-    const isAuthRoute =
-      originalRequest.url?.includes("/auth/login") ||
-      originalRequest.url?.includes("/auth/register") ||
-      originalRequest.url?.includes("/auth/refresh");
+    // const isAuthRoute =
+    //   originalRequest.url?.includes("/auth/login") ||
+    //   originalRequest.url?.includes("/auth/register") ||
+    //   originalRequest.url?.includes("/auth/refresh");
 
     // ❌ If no config or already retried → fail
     if (!originalRequest || originalRequest._retry) {
@@ -67,9 +67,10 @@ api.interceptors.response.use(
 
     // if error is 401 and not auth route, logout and send error
     if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      !isAuthRoute
+      // error.response?.status === 401 &&
+      // !originalRequest._retry &&
+      // !isAuthRoute
+      originalRequest.url?.includes("/auth/refresh")
     ) {
       useAuthStore.getState().logout();
       return Promise.reject(error);

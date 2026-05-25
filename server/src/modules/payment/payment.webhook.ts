@@ -18,7 +18,7 @@ export const stripeWebhook = async (req: Request, res: Response) => {
         // Update your DB using the provider_payment_id or metadata
         await pool.query(
             "UPDATE payments SET status = 'success', provider_payment_id = $1 WHERE idempotency_key = $2",
-            [intent.id, intent.idempotency_key]
+            [intent.id, intent.metadata.paymentIdempotencyKey]
         );
     }
 

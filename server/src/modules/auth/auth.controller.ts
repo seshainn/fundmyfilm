@@ -25,10 +25,11 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
     const isPasswordCorrect = await bcrypt.compare(password, password_hash)
     if (isPasswordCorrect) {
         const {accessToken, refreshToken, csrfToken} = generateTokens({id: user.rows[0].id, role: user.rows[0].role})
+        const hashedRefreshToken = sha256(refreshToken);
 
         await pool.query(
             "INSERT INTO refresh_tokens (token, user_id, email, expires_at) VALUES ($1,$2,$3,NOW() + INTERVAL '7 days')",
-            [refreshToken, user.rows[0].id, email]
+            [hashedRefreshToken, user.rows[0].id, email]
         );
 
         setAuthCookies(res, refreshToken, csrfToken)
@@ -44,11 +45,11 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
     const refreshToken = req.cookies?.refreshToken;
 
     if (refreshToken) {
-        const hash = sha256(refreshToken);
+        const refreshTokenHash = sha256(refreshToken);
 
         await pool.query(
         "DELETE FROM refresh_tokens WHERE token_hash = $1",
-        [hash]
+        [refreshTokenHash]
         );
     }
 
@@ -58,15 +59,16 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
 })
 
 export const refreshTokenHandler = catchAsync(async (req: Request, res: Response) => {
-    const refreshToken_unhashed = req.cookies?.refreshToken;
-    const refreshToken = sha256(refreshToken_unhashed);
+    const refreshToken = req.cookies?.refreshToken;
+
+    const refreshTokenHash = sha256(refreshToken);
 
     const tokenRecord = await pool.query(
         `SELECT rt.*, u.role
         FROM refresh_tokens rt
         JOIN users u ON rt.user_id = u.id
         WHERE rt.token_hash = $1`,
-        [refreshToken]
+        [refreshTokenHash]
     ).then(res => res.rows[0]);
 
     // ❌ REUSE DETECTED
@@ -101,7 +103,7 @@ export const refreshTokenHandler = catchAsync(async (req: Request, res: Response
         [refreshToken]
     );
 
-    const {accessToken, refreshToken: newRefreshToken, csrfToken} = generateTokens({id: tokenRecord.id, role: tokenRecord.role})
+    const {accessToken, refreshToken: newRefreshToken, csrfToken} = generateTokens({id: tokenRecord.user_id, role: tokenRecord.role})
     
 
     await pool.query(
