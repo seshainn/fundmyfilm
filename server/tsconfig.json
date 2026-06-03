@@ -27,7 +27,7 @@
     "sourceMap": true,
 
     /* 🔹 Node types */
-    "types": ["node"],
+    "types": ["node", "vitest/globals"],
 
     /* 🔹 Compatibility (TS warning fix) */
     "ignoreDeprecations": "6.0"

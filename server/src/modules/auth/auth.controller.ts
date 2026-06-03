@@ -1,117 +1,156 @@
-import { registerUserSchemaZod, loginUserSchemaZod } from "./auth.model.js"
-import type { Request, Response } from "express"
-import bcrypt from "bcrypt"
-import catchAsync from "../../config/catchAsync.js"
-import ExpressError from "../../config/expressError.js"
-import { pool } from "../../config/db.js"
-import { generateTokens, setAuthCookies, clearAuthCookies, sha256 } from "./auth.utils.js"
+import { registerUserSchemaZod, loginUserSchemaZod } from "./auth.model.js";
+import type { Request, Response } from "express";
+import bcrypt from "bcrypt";
+import catchAsync from "../../config/catchAsync.js";
+import ExpressError from "../../config/expressError.js";
+import { pool } from "../../config/db.js";
+import {
+  generateTokens,
+  setAuthCookies,
+  clearAuthCookies,
+  sha256
+} from "./auth.utils.js";
 
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
-    const { username, email, password } = registerUserSchemaZod.parse(req.body) //req.body
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt)
-    
-    await pool.query("INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)", [username, email, password_hash])
-    res.status(201).json({ message: "User created successfully" })
-})
+  const { username, email, password } = registerUserSchemaZod.parse(req.body);
+
+  const salt = await bcrypt.genSalt(10);
+  const password_hash = await bcrypt.hash(password, salt);
+
+  await pool.query(
+    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)",
+    [username, email.toLowerCase(), password_hash]
+  );
+
+  res.status(201).json({ message: "User created successfully" });
+});
 
 export const loginUser = catchAsync(async (req: Request, res: Response) => {
-    const { email, password } = loginUserSchemaZod.parse(req.body)
-    const user = await pool.query("SELECT * FROM users WHERE email = $1", [email])
-    if (user.rows.length === 0) {
-        throw new ExpressError("User not found", 404)
-    }
-    const password_hash = user.rows[0].password_hash
-    const isPasswordCorrect = await bcrypt.compare(password, password_hash)
-    if (isPasswordCorrect) {
-        const {accessToken, refreshToken, csrfToken} = generateTokens({id: user.rows[0].id, role: user.rows[0].role})
-        const hashedRefreshToken = sha256(refreshToken);
+  const { email, password } = loginUserSchemaZod.parse(req.body);
 
-        await pool.query(
-            "INSERT INTO refresh_tokens (token, user_id, email, expires_at) VALUES ($1,$2,$3,NOW() + INTERVAL '7 days')",
-            [hashedRefreshToken, user.rows[0].id, email]
-        );
+  const userResult = await pool.query(
+    "SELECT id, username, email, password_hash, role FROM users WHERE email = $1",
+    [email.toLowerCase()]
+  );
 
-        setAuthCookies(res, refreshToken, csrfToken)
-        
-        res.status(200).json({ message: "Login successful", accessToken})
+  if (userResult.rows.length === 0) {
+    throw new ExpressError("Invalid credentials", 401);
+  }
 
-    } else {
-        throw new ExpressError("Invalid credentials", 401)
-    }
-})
+  const user = userResult.rows[0];
+
+  const isPasswordCorrect = await bcrypt.compare(password, user.password_hash);
+
+  if (!isPasswordCorrect) {
+    throw new ExpressError("Invalid credentials", 401);
+  }
+
+  const {
+    accessToken,
+    refreshToken,
+    refreshTokenHash,
+    csrfToken
+  } = generateTokens({
+    id: user.id,
+    role: user.role
+  });
+
+  await pool.query(
+    `INSERT INTO refresh_tokens 
+      (token_hash, user_id, email, expires_at) 
+     VALUES 
+      ($1, $2, $3, NOW() + INTERVAL '7 days')`,
+    [refreshTokenHash, user.id, user.email]
+  );
+
+  setAuthCookies(res, refreshToken, csrfToken);
+
+  res.status(200).json({
+    message: "Login successful",
+    accessToken
+  });
+});
 
 export const logoutUser = catchAsync(async (req: Request, res: Response) => {
-    const refreshToken = req.cookies?.refreshToken;
+  const refreshToken = req.cookies?.refreshToken;
 
-    if (refreshToken) {
-        const refreshTokenHash = sha256(refreshToken);
+  if (refreshToken) {
+    const tokenHash = sha256(refreshToken);
 
-        await pool.query(
-        "DELETE FROM refresh_tokens WHERE token_hash = $1",
-        [refreshTokenHash]
-        );
+    await pool.query("DELETE FROM refresh_tokens WHERE token_hash = $1", [
+      tokenHash
+    ]);
+  }
+
+  clearAuthCookies(res);
+
+  res.status(200).json({ message: "Logged out" });
+});
+
+export const refreshTokenHandler = catchAsync(
+  async (req: Request, res: Response) => {
+    const rawRefreshToken = req.cookies?.refreshToken;
+
+    if (!rawRefreshToken) {
+      throw new ExpressError("No active session", 401);
     }
 
-    clearAuthCookies(res)
+    const tokenHash = sha256(rawRefreshToken);
 
-    res.status(200).json({ message: "Logged out" })
-})
-
-export const refreshTokenHandler = catchAsync(async (req: Request, res: Response) => {
-    const refreshToken = req.cookies?.refreshToken;
-
-    const refreshTokenHash = sha256(refreshToken);
-
-    const tokenRecord = await pool.query(
-        `SELECT rt.*, u.role
-        FROM refresh_tokens rt
-        JOIN users u ON rt.user_id = u.id
-        WHERE rt.token_hash = $1`,
-        [refreshTokenHash]
-    ).then(res => res.rows[0]);
-
-    // ❌ REUSE DETECTED
-    if (!tokenRecord) {
-        // delete all tokens for that user (if you can identify user)
-        
-        await pool.query(
-        "DELETE FROM refresh_tokens WHERE user_id = $1",
-        [tokenRecord.user_id] 
-        );
-
-        clearAuthCookies(res);
-
-        throw new ExpressError("Refresh token reuse detected", 403);
-    }
-
-    // ❌ EXPIRED
-    if (new Date(tokenRecord.expires_at) < new Date()) {
-        await pool.query(
-        "DELETE FROM refresh_tokens WHERE token_hash = $1",
-        [refreshToken]
-        );
-
-        clearAuthCookies(res);
-
-        throw new ExpressError("Refresh token expired", 401);
-    }
-
-    // ✅ VALID → rotate token
-    await pool.query(
-        "DELETE FROM refresh_tokens WHERE token_hash = $1",
-        [refreshToken]
+    const tokenRecordResult = await pool.query(
+      `SELECT 
+          rt.token_hash,
+          rt.user_id,
+          rt.email,
+          rt.expires_at,
+          u.role
+       FROM refresh_tokens rt
+       JOIN users u ON rt.user_id = u.id
+       WHERE rt.token_hash = $1`,
+      [tokenHash]
     );
 
-    const {accessToken, refreshToken: newRefreshToken, csrfToken} = generateTokens({id: tokenRecord.user_id, role: tokenRecord.role})
-    
+    const tokenRecord = tokenRecordResult.rows[0];
+
+    if (!tokenRecord) {
+      clearAuthCookies(res);
+      throw new ExpressError("Invalid refresh token", 403);
+    }
+
+    if (new Date(tokenRecord.expires_at) < new Date()) {
+      await pool.query("DELETE FROM refresh_tokens WHERE token_hash = $1", [
+        tokenHash
+      ]);
+
+      clearAuthCookies(res);
+
+      throw new ExpressError("Refresh token expired", 401);
+    }
+
+    await pool.query("DELETE FROM refresh_tokens WHERE token_hash = $1", [
+      tokenHash
+    ]);
+
+    const {
+      accessToken,
+      refreshToken: newRefreshToken,
+      refreshTokenHash: newRefreshTokenHash,
+      csrfToken
+    } = generateTokens({
+      id: tokenRecord.user_id,
+      role: tokenRecord.role
+    });
 
     await pool.query(
-        "INSERT INTO refresh_tokens (token_hash, user_id, email, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '7 days')",
-        [newRefreshToken, tokenRecord.user_id, tokenRecord.email]
+      `INSERT INTO refresh_tokens 
+        (token_hash, user_id, email, expires_at) 
+       VALUES 
+        ($1, $2, $3, NOW() + INTERVAL '7 days')`,
+      [newRefreshTokenHash, tokenRecord.user_id, tokenRecord.email]
     );
 
     setAuthCookies(res, newRefreshToken, csrfToken);
 
-    res.json({ accessToken });
-});
+    res.status(200).json({ accessToken });
+  }
+);

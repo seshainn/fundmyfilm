@@ -1,11 +1,18 @@
 import { Redis } from "ioredis";
 import ExpressError from "../config/expressError.js";
 
-if (!process.env.REDIS_URL) {
-    throw new ExpressError("Missing REDIS_URL", 500);
+const REDIS_URL = process.env.REDIS_URL;
+
+if (!REDIS_URL) {
+  throw new ExpressError("Missing REDIS_URL", 500);
 }
 
-const redis = new Redis(process.env.REDIS_URL);
+export const createRedisConnection = () =>
+  new Redis(REDIS_URL, {
+    maxRetriesPerRequest: null
+  });
+
+const redis = createRedisConnection();
 
 export const connectRedis = async () => {
   try {

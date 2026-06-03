@@ -1,12 +1,12 @@
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-import { initAuth } from "@/components/initAuth.ts";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import App from "./App";
+import { initAuth } from "@/components/initAuth";
 
 (async () => {
   await initAuth();
 
   createRoot(document.getElementById("root")!).render(
-    <App />
+      <App />
   );
 })();

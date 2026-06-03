@@ -3,35 +3,52 @@ import type { Request, Response, NextFunction } from "express";
 import { logger } from "../config/logger.js";
 import { RateLimiterRedis } from "rate-limiter-flexible";
 
-const rateLimiter = new RateLimiterRedis({
+const generalRateLimiter = new RateLimiterRedis({
   storeClient: redis,
-  keyPrefix: "middleware:ratelimiter",
-  points: 5,
-  duration: 1
-})
-export const idOrIpRateLimiter = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.ip) {
-    res.status(400).json({ message: "Unable to determine client IP" });
-    return;
-  }
-  const id = req.user?.id || req.ip
-  rateLimiter.consume(id).then(() => {
-    next()
-  }).catch(() => {
-    logger.warn(`Rate limit exceeded for user at IP: ${req.ip}`)
-    res.status(429).json({ message: "Too many requests from the same user and IP" })
-  })
-}
+  keyPrefix: "rl:general",
+  points: 60,
+  duration: 60
+});
 
-export const emailRateLimiter = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.body.email) {
-    res.status(400).json({ message: "Unable to determine email of user" });
-    return;
+const loginRateLimiter = new RateLimiterRedis({
+  storeClient: redis,
+  keyPrefix: "rl:login",
+  points: 5,
+  duration: 15 * 60
+});
+
+export const idOrIpRateLimiter = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const key = String(req.user?.id || req.ip || "unknown");
+
+  generalRateLimiter
+    .consume(key)
+    .then(() => next())
+    .catch(() => {
+      logger.warn(`Rate limit exceeded for key: ${key}`);
+      res.status(429).json({ message: "Too many requests" });
+    });
+};
+
+export const emailRateLimiter = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const email = req.body?.email;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
   }
-  rateLimiter.consume(req.body.email).then(() => {
-    next()
-  }).catch(() => {
-    logger.warn(`Rate limit exceeded for email: ${req.body.email}`)
-    res.status(429).json({ message: "Too many login attempts from same email" })
-  })
-}
+
+  loginRateLimiter
+    .consume(String(email).toLowerCase())
+    .then(() => next())
+    .catch(() => {
+      logger.warn(`Rate limit exceeded for email: ${email}`);
+      res.status(429).json({ message: "Too many login attempts" });
+    });
+};

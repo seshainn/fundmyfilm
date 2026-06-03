@@ -1,19 +1,15 @@
-// src/components/Navbar.tsx
 import { Link } from "react-router-dom";
 import { FaSun, FaMoon } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/authStore";
-import { api } from "../api/client";
+import { api } from "@/api/client";
 
 export default function Navbar() {
   const { accessToken, logout, isInitialized } = useAuthStore();
 
-  // Persisted dark mode
-  const [dark, setDark] = useState(
-    localStorage.getItem("theme") === "dark"
-  );
+  const [dark, setDark] = useState(localStorage.getItem("theme") === "dark");
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -26,32 +22,30 @@ export default function Navbar() {
     } catch (err) {
       console.warn("Logout request failed", err);
     } finally {
-      logout(); 
-  }
-};
+      logout();
+    }
+  };
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 
-      bg-orange-500 dark:bg-gray-900 text-white shadow">
-
-      {/* Left */}
+    <div className="flex items-center justify-between px-6 py-4 bg-orange-500 dark:bg-gray-900 text-white shadow">
       <Link to="/" className="text-xl font-bold tracking-wide">
         🎬 ProduceAFilm
       </Link>
 
-      {/* Center */}
       <Input
         placeholder="Search a film..."
         className="w-1/3 bg-white text-black dark:bg-gray-800 dark:text-white"
       />
 
-      {/* Right */}
       <div className="flex gap-3 items-center">
-        { isInitialized ? (
+        {isInitialized ? (
           !accessToken ? (
             <>
               <Link to="/login">
-                <Button variant="secondary" className="bg-white text-black hover:bg-gray-200">
+                <Button
+                  variant="secondary"
+                  className="bg-white text-black hover:bg-gray-200"
+                >
                   Sign In
                 </Button>
               </Link>
@@ -74,11 +68,11 @@ export default function Navbar() {
           <div className="w-20 h-8 bg-gray-200 animate-pulse rounded" />
         )}
 
-        {/* Dark mode toggle */}
         <Button
           variant="ghost"
           onClick={() => setDark(!dark)}
           className="text-white hover:bg-white/20"
+          aria-label="Toggle theme"
         >
           {dark ? <FaSun /> : <FaMoon />}
         </Button>

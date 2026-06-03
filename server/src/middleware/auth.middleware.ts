@@ -40,7 +40,11 @@ export const validateAccessToken = catchAsync(async (req: Request, res: Response
 export const validateCsrfToken = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const csrfCookie = req.cookies?.csrfToken;
-    const csrfHeader = req.headers["x-csrf-token"];
+    const csrfHeaderRaw = req.headers["x-csrf-token"];
+
+    const csrfHeader = Array.isArray(csrfHeaderRaw)
+      ? csrfHeaderRaw[0]
+      : csrfHeaderRaw;
 
     if (!csrfCookie || !csrfHeader) {
       throw new ExpressError("CSRF token missing", 403);
@@ -50,7 +54,7 @@ export const validateCsrfToken = catchAsync(
       throw new ExpressError("Invalid CSRF token", 403);
     }
 
-    return next();
+    next();
   }
 );
 
@@ -62,7 +66,7 @@ export const validateRefreshToken = catchAsync(
       return res.status(401).json({ message: "No active session" });
     }
     //add db check here also for additional security  
-    return next();
+    next();
   }
 );
 
@@ -71,6 +75,6 @@ export const requireRole = (...roles: string[]) => {
     if (!req.user || !roles.includes(req.user.role)) {
       throw new ExpressError("Forbidden", 403);
     }
-    return next();
+    next();
   };
 };
